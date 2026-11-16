@@ -1,0 +1,25 @@
+[Desktop Entry]
+Type=Application
+Name=SYSDECK
+GenericName=System Monitor
+Comment=System, GPU, storage and Ollama monitor for a second screen
+Exec=@BIN@
+Icon=sysdeck
+Terminal=false
+Categories=System;Monitor;
+Keywords=monitor;system;gpu;ollama;llm;dashboard;
+StartupWMClass=sysdeck
+SingleMainWindow=true
+Actions=Toggle;Restart;Quit;
+
+[Desktop Action Toggle]
+Name=Show / hide
+Exec=@BIN@ toggle
+
+[Desktop Action Restart]
+Name=Restart
+Exec=@BIN@ restart
+
+[Desktop Action Quit]
+Name=Quit
+Exec=@BIN@ quit

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYSDECK</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 40 40" aria-hidden="true">
+        <defs>
+          <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#3fd0ff"/><stop offset=".55" stop-color="#a78bfa"/><stop offset="1" stop-color="#ff5fb7"/>
+          </linearGradient>
+        </defs>
+        <path d="M20 2 36 11v18L20 38 4 29V11Z" fill="none" stroke="url(#lg)" stroke-width="2.2"/>
+        <path d="M20 10 28 14.5v9L20 28l-8-4.5v-9Z" fill="url(#lg)" opacity=".9"/>
+      </svg>
+      <div class="brand-txt"><b>SYSDECK</b><span id="host">—</span></div>
+    </div>
+    <div class="sysline">
+      <span class="tag" id="os">—</span>
+      <span class="tag" id="kernel">—</span>
+      <span class="tag" id="uptime">—</span>
+      <span class="tag" id="power">—</span>
+      <span class="tag vpn" id="vpn" hidden>VPN</span>
+    </div>
+    <div class="alerts" id="alerts"></div>
+    <div class="clock">
+      <div class="clock-time"><span id="time">--:--</span><span id="secs">--</span></div>
+      <div class="clock-date" id="date">—</div>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- ───────────── left ───────────── -->
+    <div class="col">
+      <section class="panel" id="p-cpu" style="--a:var(--cyan);--a2:var(--violet)">
+        <header><h2>CPU</h2><span class="sub" id="cpu-model">—</span></header>
+        <div class="gauge-row">
+          <div class="ring" id="cpu-ring"></div>
+          <dl class="kv" id="cpu-kv"></dl>
+        </div>
+        <div class="chart-wrap"><canvas id="ch-cpu"></canvas></div>
+        <div class="cores" id="cores"></div>
+      </section>
+
+      <section class="panel" id="p-mem" style="--a:var(--amber);--a2:var(--orange)">
+        <header><h2>Memory</h2><span class="sub" id="mem-sub">—</span></header>
+        <div class="big-row">
+          <div class="big"><span id="mem-used">0</span><small id="mem-total">/ — GiB</small></div>
+          <div class="big-side"><b id="mem-avail">—</b><span>available</span></div>
+        </div>
+        <div class="segbar" id="mem-bar"></div>
+        <div class="legend" id="mem-legend"></div>
+        <div class="chart-wrap short"><canvas id="ch-mem"></canvas></div>
+        <div class="minibar"><span>SWAP</span><div class="track"><i id="swap-fill"></i></div><span id="swap-txt">—</span></div>
+      </section>
+
+      <section class="panel" id="p-procs" style="--a:var(--cyan);--a2:var(--amber)">
+        <header><h2>Processes</h2><span class="sub" id="proc-count">—</span></header>
+        <div class="two">
+          <div><h3>Top CPU</h3><ol class="plist" id="pl-cpu"></ol></div>
+          <div><h3>Top memory <em>private</em></h3><ol class="plist mem" id="pl-mem"></ol></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ───────────── center ───────────── -->
+    <div class="col center">
+      <section class="panel ai" id="p-ai" style="--a:var(--pink);--a2:var(--violet)">
+        <header>
+          <h2>AI Core</h2><span class="sub" id="ollama-ver">ollama</span>
+          <span class="pill" id="ai-phase" data-phase="offline">OFFLINE</span>
+        </header>
+
+        <div class="ai-model">
+          <div class="ai-id">
+            <div class="model-name" id="model-name">—</div>
+            <div class="chips" id="model-chips"></div>
+          </div>
+          <div class="keepalive">
+            <div class="ring small" id="ka-ring"></div>
+            <span>keep-alive</span>
+          </div>
+        </div>
+
+        <div class="placement">
+          <div class="row-head"><span>Model placement</span><span id="pl-layers"></span></div>
+          <div class="pl-bar"><i class="g" id="place-gpu"></i><i class="c" id="place-cpu"></i></div>
+          <div class="pl-foot">
+            <span><i class="sw g"></i>GPU <b id="pl-gpu-txt">—</b></span>
+            <span><i class="sw c"></i>CPU <b id="pl-cpu-txt">—</b></span>
+          </div>
+          <div class="hint" id="pl-hint"></div>
+        </div>
+
+        <div class="tps">
+          <div class="tps-num">
+            <em id="tps-label">last run</em>
+            <div><span id="tps">0.0</span><small>tok/s</small></div>
+            <div class="prefill" id="prefill" hidden><i id="prefill-fill"></i><span id="prefill-txt"></span></div>
+          </div>
+          <div class="chart-wrap"><canvas id="ch-tps"></canvas></div>
+        </div>
+
+        <div class="tiles" id="ai-tiles"></div>
+
+        <div class="feed-wrap">
+          <div class="row-head"><span>Recent requests</span><span id="feed-count"></span></div>
+          <ol class="feed" id="feed"></ol>
+        </div>
+
+        <footer class="ai-actions">
+          <button id="btn-bench" type="button"><svg viewBox="0 0 16 16"><path d="M8 1v3M8 12v3M1 8h3M12 8h3M3 3l2 2M11 11l2 2M13 3l-2 2M5 11l-2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>Benchmark</button>
+          <button id="btn-unload" type="button"><svg viewBox="0 0 16 16"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 13h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>Unload</button>
+          <span class="bench-res" id="bench-res"></span>
+          <div class="installed" id="installed"></div>
+        </footer>
+      </section>
+
+      <section class="panel" id="p-gpu" style="--a:var(--violet);--a2:var(--pink)">
+        <header><h2>GPU</h2><span class="sub" id="gpu-name">—</span><span class="pill soft" id="gpu-pstate">—</span></header>
+        <div class="gpu-top">
+          <div class="ring" id="gpu-ring"></div>
+          <div class="ring" id="vram-ring"></div>
+          <div class="tiles four" id="gpu-tiles"></div>
+        </div>
+        <div class="chart-wrap"><canvas id="ch-gpu"></canvas></div>
+        <div class="vram-apps">
+          <div class="row-head"><span>VRAM by process</span><span id="vram-txt"></span></div>
+          <div class="segbar thin" id="vram-bar"></div>
+          <div class="legend" id="vram-legend"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ───────────── right ───────────── -->
+    <div class="col">
+      <section class="panel" id="p-net" style="--a:var(--green);--a2:var(--cyan)">
+        <header><h2>Network</h2><span class="sub" id="net-ifaces">—</span></header>
+        <div class="io-row">
+          <div class="io dn"><span>↓ down</span><b id="net-rx">—</b></div>
+          <div class="io up"><span>↑ up</span><b id="net-tx">—</b></div>
+        </div>
+        <div class="chart-wrap"><canvas id="ch-net"></canvas></div>
+        <div class="foot-row" id="net-foot"></div>
+      </section>
+
+      <section class="panel" id="p-disk" style="--a:var(--orange);--a2:var(--amber)">
+        <header><h2>Storage</h2><span class="sub" id="disk-sub">—</span></header>
+        <div class="disk-top">
+          <div class="io-stack">
+            <div class="io dn"><span>read</span><b id="disk-rd">—</b></div>
+            <div class="io up"><span>write</span><b id="disk-wr">—</b></div>
+          </div>
+          <div class="chart-wrap"><canvas id="ch-disk"></canvas></div>
+        </div>
+        <div class="drives" id="drives"></div>
+        <div class="foot-row" id="disk-extra"></div>
+      </section>
+
+      <section class="panel" id="p-dev" style="--a:var(--blue);--a2:var(--green)">
+        <header><h2>Dev</h2><span class="sub">listening ports · containers</span></header>
+        <ol class="ports" id="ports"></ol>
+        <div class="row-head"><span>Docker</span><span id="docker-state"></span></div>
+        <ol class="containers" id="containers"></ol>
+      </section>
+    </div>
+  </main>
+  <div class="conn" id="conn" hidden>reconnecting to sysdeck backend…</div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

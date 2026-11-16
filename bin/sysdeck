@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# sysdeck — launcher for the SYSDECK desktop app.
+#
+#   sysdeck            start the app, or show it if it is already running
+#   sysdeck hide       hide the window (keeps running in the tray)
+#   sysdeck toggle     show / hide
+#   sysdeck quit       quit the app
+#   sysdeck restart    quit and start again
+#   sysdeck logs       follow the app log
+#
+# Settings (screen, full-screen, zoom, privacy) live in ~/.config/sysdeck/config.json
+# and can be changed from the tray icon menu.
+set -euo pipefail
+
+# Find app.py: $SYSDECK_HOME, the source tree next to this script, or the installed copy.
+here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+for cand in "${SYSDECK_HOME:-}" "$here/../sysdeck" "${XDG_DATA_HOME:-$HOME/.local/share}/sysdeck"; do
+  if [[ -n "$cand" && -f "$cand/app.py" ]]; then APP="$(cd "$cand" && pwd)/app.py"; break; fi
+done
+[[ -n "${APP:-}" ]] || { echo "sysdeck: app.py not found (set SYSDECK_HOME)" >&2; exit 1; }
+
+PY="${SYSDECK_PYTHON:-python3}"
+LOGDIR="${XDG_STATE_HOME:-$HOME/.local/state}/sysdeck"
+LOG="$LOGDIR/app.log"
+mkdir -p "$LOGDIR"
+
+running() { pgrep -f -- "$APP" >/dev/null; }
+send() { setsid -f "$PY" "$APP" "$1" >>"$LOG" 2>&1 </dev/null; }  # starts it, or forwards to the running instance
+
+case "${1:-show}" in
+  show|hide|toggle) send "${1:-show}" ;;
+  quit) running && "$PY" "$APP" quit || true ;;
+  restart)
+    running && "$PY" "$APP" quit || true
+    for _ in $(seq 1 30); do running || break; sleep 0.2; done
+    send show
+    ;;
+  logs) tail -f "$LOG" ;;
+  -h|--help|help) sed -n '2,12p' "$0" ;;
+  *) sed -n '2,12p' "$0"; exit 1 ;;
+esac
