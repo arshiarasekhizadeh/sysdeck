@@ -27,13 +27,14 @@ SYSDECK shows CPU, memory, GPU, storage, network and your dev servers at a glanc
 - Dev: listening ports with the **project folder** of each dev server, LAN-exposed ports highlighted, Docker containers
 - Top processes by CPU and by private memory, grouped by name
 - Alerts for high temperatures, low RAM, full VRAM and full disks
+- **Media**: now playing with cover art, seekable progress, play/pause, next/previous, shuffle, repeat and volume for **any player**: Spotify, YouTube or any other tab in Firefox/Chrome/Chromium, VLC, mpv, Rhythmbox, Elisa, Strawberry... (anything that speaks MPRIS). It follows whichever player started last; click a player's name to pin it.
 
 **App**
 - Native desktop app (PyQt6) with a tray icon, not a browser tab
 - Opens full-screen on the monitor you choose and remembers it
 - Zoom (Ctrl +/−/0 or tray menu) with a compact layout that keeps every panel complete on small or high-zoom screens
 - **Privacy mode** hides host name, IP addresses and project folders, which is handy for screen sharing and screenshots
-- Lightweight: no telemetry, no network access beyond `127.0.0.1`. Animations are tuned so the dashboard costs roughly 10–20% of one CPU core.
+- Lightweight: no telemetry, no network access beyond `127.0.0.1`, except downloading the cover art your media player points to (e.g. Spotify's image CDN). Animations are tuned so the dashboard costs roughly 10–20% of one CPU core.
 
 ## Requirements
 
@@ -50,6 +51,7 @@ Optional, each one lights up more of the dashboard:
 | Read access to the systemd journal | live tok/s, layer offload, request timings |
 | `udisks2` | drive health (wear, TB written, power-on hours) |
 | `docker` | containers list and Docker disk usage |
+| `busctl` (systemd) + a session D-Bus | Media panel (MPRIS). mpv needs the `mpv-mpris` plugin. |
 
 ## Install
 
@@ -136,7 +138,8 @@ app.py  ── PyQt6 window + tray, single instance, screen/zoom placement
         ├─ Ollama HTTP API ... loaded models, installed models
         ├─ journalctl -f ..... Ollama runner log → layer offload, prefill, live tok/s, timings
         ├─ lsblk + UDisks2 ... drives, partitions, NVMe health (no root)
-        └─ docker ............ containers, disk usage
+        ├─ docker ............ containers, disk usage
+        └─ busctl --user ..... MPRIS media players: now playing + controls
      → Server-Sent Events → static/ (HTML, CSS, canvas charts)
 ```
 

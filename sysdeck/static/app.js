@@ -332,6 +332,7 @@ function render(s) {
   renderNet(s);
   renderDisk(s);
   renderDev(s);
+  renderMedia(s);
 }
 
 function renderHeader(s) {
@@ -691,6 +692,143 @@ function renderDev(s) {
     ? d.containers.map((c) => `<li><span class="nm">${esc(c.name)}<em>${esc(c.image)}</em></span><span class="st">${esc(c.status)}</span></li>`).join("")
     : `<li class="empty">${d.available ? "no containers running" : "docker not reachable"}</li>`);
 }
+
+/* ───────────── media (any MPRIS player: Spotify, browsers, VLC, mpv, …) ───────────── */
+let NP = null;           // { p: active player, t: when its position was sampled (s) }
+let npArt = undefined;   // art key currently shown
+let npHold = 0;          // ignore stale stream data briefly after a local action
+function fmtTime(s) {
+  if (s == null || !isFinite(s)) return "–:––";
+  s = Math.max(0, Math.floor(s));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+function npPos() {
+  const p = NP?.p;
+  if (!p || p.position == null) return null;
+  let x = p.position;
+  if (p.status === "Playing") x += (Date.now() / 1000 - NP.t) * (p.rate || 1);
+  return p.length ? Math.min(x, p.length) : x;
+}
+function tickMedia() {
+  const p = NP?.p;
+  if (!p) return;
+  const pos = npPos();
+  $("np-pos").textContent = fmtTime(pos);
+  $("np-len").textContent = fmtTime(p.length);
+  $("np-fill").style.width = p.length && pos != null ? `${clamp(pos / p.length) * 100}%` : "0%";
+}
+setInterval(() => { if (!document.hidden && NP?.p?.status === "Playing") tickMedia(); }, 500);
+
+function renderMedia(s, local = false) {
+  const m = s.media || {};
+  const players = m.players || [];
+  $("p-media").hidden = !players.length;
+  if (!players.length) { NP = null; return; }
+  if (!local && performance.now() < npHold) return;
+  const p = players.find((x) => x.id === m.active) || players[0];
+  NP = { p, t: m.t || Date.now() / 1000 };
+  const playing = p.status === "Playing";
+
+  const pill = $("np-state");
+  pill.dataset.phase = playing ? "ready" : "idle";
+  pill.textContent = playing ? "playing" : p.status === "Paused" ? "paused" : "stopped";
+  setHTML($("np-src"), players.length > 1
+    ? players.map((x) => `<button type="button" data-id="${esc(x.id)}" class="${x.id === p.id ? "on" : ""}" title="${esc(x.title || x.name)}">${esc(x.name)}${x.status === "Playing" && x.id !== p.id ? " <i>▸</i>" : ""}</button>`).join("")
+    : esc(p.name));
+
+  $("np-title").textContent = p.title || (playing ? "Unknown track" : "Nothing playing");
+  setHTML($("np-artist"), [p.artist && `<b>${esc(p.artist)}</b>`, p.album && p.album !== p.title && esc(p.album)].filter(Boolean).join(" · "));
+
+  if (p.art !== npArt) {
+    npArt = p.art;
+    const img = $("np-img"), bg = $("np-bg");
+    if (p.art) {
+      const url = `/api/media/art?k=${encodeURIComponent(p.art)}`;
+      img.onload = () => { img.hidden = false; bg.style.backgroundImage = `url("${url}")`; bg.classList.add("on"); };
+      img.onerror = () => { img.hidden = true; bg.classList.remove("on"); };
+      img.src = url;
+    } else {
+      img.hidden = true; img.removeAttribute("src"); bg.classList.remove("on");
+    }
+  }
+
+  const can = p.can || {}, ctl = can.control !== false;
+  const play = $("np-play");
+  play.classList.toggle("playing", playing);
+  play.disabled = !ctl || !(playing ? can.pause : can.play);
+  $("np-prev").disabled = !ctl || !can.prev;
+  $("np-next").disabled = !ctl || !can.next;
+  $("np-bar").classList.toggle("off", !ctl || !can.seek);
+  const sh = $("np-shuffle"), lp = $("np-loop");
+  sh.hidden = p.shuffle == null;
+  sh.classList.toggle("on", !!p.shuffle);
+  lp.hidden = p.loop == null;
+  lp.classList.toggle("on", p.loop === "Playlist" || p.loop === "Track");
+  lp.classList.toggle("one", p.loop === "Track");
+  lp.title = { None: "Repeat: off", Playlist: "Repeat: all", Track: "Repeat: one" }[p.loop] || "Repeat";
+  $("np-vol").hidden = p.volume == null;
+  if (p.volume != null) {
+    $("np-vfill").style.width = `${clamp(p.volume) * 100}%`;
+    $("np-vol").classList.toggle("mute", p.volume < 0.01);
+    $("np-vol").title = `Volume ${Math.round(p.volume * 100)}% (click or scroll)`;
+  }
+  tickMedia();
+}
+
+function mediaDo(action, value, player) {
+  if (!NP?.p) return;
+  post("/api/media", { action, value, player: player || NP.p.id });
+}
+/* apply a change locally right away, then let the stream confirm it */
+function npOptimistic(fn) {
+  if (!NP?.p) return;
+  NP.p.position = npPos();
+  NP.t = Date.now() / 1000;
+  fn(NP.p);
+  npHold = performance.now() + 700;
+  renderMedia({ media: { ...S.media, active: NP.p.id, t: NP.t,
+    players: (S.media?.players || []).map((x) => (x.id === NP.p.id ? NP.p : x)) } }, true);
+}
+const barFrac = (el, ev) => { const r = el.getBoundingClientRect(); return clamp((ev.clientX - r.left) / r.width); };
+
+$("np-play").addEventListener("click", () => {
+  npOptimistic((p) => { p.status = p.status === "Playing" ? "Paused" : "Playing"; });
+  mediaDo("play_pause");
+});
+$("np-prev").addEventListener("click", () => mediaDo("previous"));
+$("np-next").addEventListener("click", () => mediaDo("next"));
+$("np-shuffle").addEventListener("click", () => {
+  const v = !NP?.p?.shuffle;
+  npOptimistic((p) => { p.shuffle = v; });
+  mediaDo("shuffle", v);
+});
+$("np-loop").addEventListener("click", () => {
+  const v = { None: "Playlist", Playlist: "Track", Track: "None" }[NP?.p?.loop] || "None";
+  npOptimistic((p) => { p.loop = v; });
+  mediaDo("loop", v);
+});
+$("np-bar").addEventListener("click", (ev) => {
+  const p = NP?.p;
+  if (!p?.length || !p.can?.seek || p.can?.control === false) return;
+  const target = barFrac($("np-bar"), ev) * p.length;
+  npOptimistic((q) => { q.position = target; });
+  mediaDo("seek", target);
+});
+const setVol = (v) => {
+  v = Math.round(clamp(v) * 100) / 100;
+  npOptimistic((p) => { p.volume = v; });
+  mediaDo("volume", v);
+};
+$("np-vbar").addEventListener("click", (ev) => setVol(barFrac($("np-vbar"), ev)));
+$("np-vol").addEventListener("wheel", (ev) => {
+  ev.preventDefault();
+  if (NP?.p?.volume != null) setVol(NP.p.volume + (ev.deltaY < 0 ? 0.05 : -0.05));
+}, { passive: false });
+$("np-src").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-id]");
+  if (b) mediaDo("select", null, b.dataset.id);
+});
 
 /* ───────────── clock ───────────── */
 function clock() {

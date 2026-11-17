@@ -110,9 +110,9 @@ b { font-weight: 600; }
 #p-procs { flex: 1; }
 #p-ai { flex: 1.62; }
 #p-gpu { flex: 1; }
-#p-net { flex: .8; }
-#p-disk { flex: 1.9; }
-#p-dev { flex: .95; }
+#p-net { flex: .66; }
+#p-disk { flex: 2.4; }
+#p-dev { flex: .7; }
 
 .panel {
   --a: var(--cyan); --a2: var(--violet);
@@ -469,6 +469,75 @@ button.busy svg { animation: rot 1.2s linear infinite; }
 .containers li .st { color: var(--green); }
 .containers .empty { color: var(--faint); background: none; padding-left: 0; }
 
+/* ───────────── media (MPRIS) ───────────── */
+#p-media { flex: none; isolation: isolate; }
+/* blurred cover behind the panel; static, so it costs nothing once painted */
+.np-bg {
+  position: absolute; inset: -40px; z-index: -1; pointer-events: none;
+  background: center / cover no-repeat; filter: blur(38px) saturate(1.5);
+  opacity: 0; transition: opacity .6s;
+}
+.np-bg.on { opacity: .24; }
+.np-src { display: flex; gap: 5px; overflow: hidden; }
+.np-src button {
+  font: 500 10.5px/1 var(--mono); letter-spacing: .04em; text-transform: none;
+  padding: 4px 8px; border-radius: 999px; color: var(--dim); background: rgba(255, 255, 255, .03);
+  white-space: nowrap; flex: none;
+}
+.np-src button.on { color: var(--text); border-color: color-mix(in srgb, var(--a) 55%, transparent); background: color-mix(in srgb, var(--a) 12%, transparent); }
+.np-src button.on::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--a); }
+.np-src button i { font-style: normal; color: var(--a); }
+
+.np { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 14px; align-items: center; }
+.np-art {
+  position: relative; width: 84px; height: 84px; border-radius: 10px; overflow: hidden;
+  display: grid; place-items: center; color: var(--faint);
+  background: linear-gradient(135deg, rgba(62, 232, 165, .10), rgba(63, 208, 255, .06));
+  border: 1px solid var(--line2); box-shadow: 0 14px 28px -14px rgba(0, 0, 0, .9);
+}
+.np-art .np-note { width: 38%; height: 38%; }
+.np-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.np-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.np-title { font: 600 18px/1.2 var(--sans); letter-spacing: -.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-artist { font: 13px/1.25 var(--sans); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.25em; }
+.np-artist b { color: var(--text); font-weight: 500; }
+.np-prog { display: grid; grid-template-columns: 38px minmax(0, 1fr) 38px; gap: 8px; align-items: center; font: 11px/1 var(--mono); color: var(--dim); margin-top: 2px; }
+.np-prog span:last-child { text-align: right; }
+.np-bar { position: relative; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .08); cursor: pointer; }
+.np-bar::before { content: ""; position: absolute; inset: -7px 0; }  /* bigger hit area */
+.np-bar i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--a), var(--a2)); }
+.np-bar i::after {
+  content: ""; position: absolute; right: -5px; top: 50%; width: 10px; height: 10px; margin-top: -5px;
+  border-radius: 50%; background: #fff; box-shadow: 0 0 8px var(--a); opacity: 0; transition: opacity .15s;
+}
+.np-bar:hover i::after { opacity: 1; }
+.np-bar.off { cursor: default; }
+.np-bar.off i::after { display: none; }
+
+.np-ctl { display: flex; align-items: center; gap: 2px; margin-top: 1px; }
+.np-ctl .np-btn {
+  position: relative; width: 30px; height: 30px; padding: 0; justify-content: center; flex: none;
+  border: 0; border-radius: 50%; background: transparent; color: var(--dim);
+}
+.np-ctl .np-btn svg { width: 15px; height: 15px; }
+.np-ctl .np-btn:hover { color: var(--text); background: rgba(255, 255, 255, .07); }
+.np-ctl .np-btn:disabled { opacity: .3; cursor: default; background: transparent; }
+.np-ctl .np-btn.on { color: var(--a); }
+.np-ctl .np-btn.on::after { content: ""; position: absolute; bottom: 2px; left: 50%; width: 3px; height: 3px; margin-left: -1.5px; border-radius: 50%; background: currentColor; }
+.np-one { display: none; position: absolute; top: 4px; right: 4px; font: 700 7.5px/1 var(--mono); }
+.np-btn.one .np-one { display: block; }
+.np-ctl .np-play { width: 36px; height: 36px; margin: 0 3px; color: var(--bg); background: var(--text); box-shadow: 0 0 18px color-mix(in srgb, var(--a) 30%, transparent); }
+.np-ctl .np-play:hover { color: var(--bg); background: #fff; }
+.np-ctl .np-play svg { width: 14px; height: 14px; }
+.np-play .i-pause, .np-play.playing .i-play { display: none; }
+.np-play.playing .i-pause { display: inline; }
+.np-vol { margin-left: auto; display: flex; align-items: center; gap: 7px; width: 34%; max-width: 130px; min-width: 56px; color: var(--dim); }
+.np-vol svg { width: 15px; height: 15px; flex: none; }
+.np-vol.mute .np-wave { display: none; }
+.np-vbar { flex: 1; height: 4px; }
+.np-vbar i { background: var(--dim); }
+.np-vol:hover .np-vbar i { background: linear-gradient(90deg, var(--a), var(--a2)); }
+
 .conn {
   position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
   font: 600 12px/1 var(--mono); letter-spacing: .1em; color: var(--amber);
@@ -608,4 +677,18 @@ html:not(.anim) *, html:not(.anim) *::before, html:not(.anim) *::after { transit
   .ports .who em { font-size: 10px; }
   .scope { font-size: 8.5px; padding: 2px 5px; }
   .containers li { font-size: 10px; padding: 3px 7px; }
+
+  .np { grid-template-columns: 62px minmax(0, 1fr); gap: 10px; }
+  .np-art { width: 62px; height: 62px; border-radius: 8px; }
+  .np-body { gap: 3px; }
+  .np-title { font-size: 14px; }
+  .np-artist { font-size: 11px; }
+  .np-prog { font-size: 9.5px; grid-template-columns: 30px minmax(0, 1fr) 30px; gap: 6px; margin-top: 0; }
+  .np-bar { height: 4px; }
+  .np-ctl .np-btn { width: 24px; height: 24px; }
+  .np-ctl .np-btn svg { width: 12px; height: 12px; }
+  .np-ctl .np-play { width: 28px; height: 28px; }
+  .np-ctl .np-play svg { width: 11px; height: 11px; }
+  .np-vol svg { width: 12px; height: 12px; }
+  .np-src button { font-size: 9px; padding: 3px 6px; }
 }

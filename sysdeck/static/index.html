@@ -142,6 +142,40 @@
 
     <!-- ───────────── right ───────────── -->
     <div class="col">
+      <section class="panel media" id="p-media" style="--a:var(--green);--a2:var(--cyan)" hidden>
+        <div class="np-bg" id="np-bg" aria-hidden="true"></div>
+        <header>
+          <h2>Media</h2><span class="sub np-src" id="np-src">—</span>
+          <span class="pill" id="np-state" data-phase="idle">—</span>
+        </header>
+        <div class="np">
+          <div class="np-art" id="np-art">
+            <svg class="np-note" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm11-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            <img id="np-img" alt="" hidden>
+          </div>
+          <div class="np-body">
+            <div class="np-title" id="np-title">—</div>
+            <div class="np-artist" id="np-artist"></div>
+            <div class="np-prog">
+              <span id="np-pos">–:––</span>
+              <div class="np-bar" id="np-bar" title="Seek"><i id="np-fill"></i></div>
+              <span id="np-len">–:––</span>
+            </div>
+            <div class="np-ctl">
+              <button type="button" class="np-btn" id="np-shuffle" title="Shuffle"><svg viewBox="0 0 16 16"><path d="M2 4.5h2.5c1.5 0 2.4.8 3.2 2l1.6 3c.8 1.2 1.7 2 3.2 2H14M2 11.5h2.5c1 0 1.7-.4 2.3-1M9.2 5.5c.6-.6 1.3-1 2.3-1H14M12 2.5l2 2-2 2M12 9.5l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <button type="button" class="np-btn" id="np-prev" title="Previous"><svg viewBox="0 0 16 16"><path d="M3.5 3v10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13 3.6v8.8a.6.6 0 0 1-.9.5L5.4 8.5a.6.6 0 0 1 0-1l6.7-4.4a.6.6 0 0 1 .9.5Z" fill="currentColor"/></svg></button>
+              <button type="button" class="np-btn np-play" id="np-play" title="Play / pause"><svg viewBox="0 0 16 16"><path class="i-play" d="M5 3.3v9.4a.6.6 0 0 0 .9.5l7.3-4.7a.6.6 0 0 0 0-1L5.9 2.8a.6.6 0 0 0-.9.5Z" fill="currentColor"/><path class="i-pause" d="M4.5 3h2.2v10H4.5zM9.3 3h2.2v10H9.3z" fill="currentColor"/></svg></button>
+              <button type="button" class="np-btn" id="np-next" title="Next"><svg viewBox="0 0 16 16"><path d="M12.5 3v10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3 3.6v8.8a.6.6 0 0 0 .9.5l6.7-4.4a.6.6 0 0 0 0-1L3.9 3.1a.6.6 0 0 0-.9.5Z" fill="currentColor"/></svg></button>
+              <button type="button" class="np-btn" id="np-loop" title="Repeat"><svg viewBox="0 0 16 16"><path d="M11.5 1.8 13.7 4l-2.2 2.2M13.5 4H5a2.5 2.5 0 0 0-2.5 2.5V7.5M4.5 14.2 2.3 12l2.2-2.2M2.5 12H11a2.5 2.5 0 0 0 2.5-2.5V8.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><b class="np-one">1</b></button>
+              <div class="np-vol" id="np-vol" title="Volume (click or scroll)">
+                <svg viewBox="0 0 16 16"><path d="M2.5 6h2.2L8 3.2v9.6L4.7 10H2.5Z" fill="currentColor"/><path class="np-wave" d="M10.5 5.5a3.5 3.5 0 0 1 0 5M12.4 3.6a6.2 6.2 0 0 1 0 8.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <div class="np-bar np-vbar" id="np-vbar"><i id="np-vfill"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel" id="p-net" style="--a:var(--green);--a2:var(--cyan)">
         <header><h2>Network</h2><span class="sub" id="net-ifaces">—</span></header>
         <div class="io-row">

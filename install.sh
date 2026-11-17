@@ -45,6 +45,8 @@ fi
 command -v busctl >/dev/null && busctl --system status org.freedesktop.UDisks2 >/dev/null 2>&1 \
   && ok "udisks2 (drive health)" || warn "udisks2 not running: drive health (wear, TB written) won't show"
 command -v docker >/dev/null && ok "docker (optional)" || true
+command -v busctl >/dev/null && busctl --user status >/dev/null 2>&1 \
+  && ok "session D-Bus (media controls)" || warn "busctl --user unavailable: the Media panel stays hidden"
 
 if (( missing )); then
   echo
@@ -59,7 +61,7 @@ fi
 
 echo
 bold "Installing"
-"$SRC/bin/sysdeck" quit >/dev/null 2>&1 || true
+SYSDECK_HOME="$APP_DIR" "$SRC/bin/sysdeck" quit >/dev/null 2>&1 || true  # stop the installed copy, not the source tree
 mkdir -p "$APP_DIR/static" "$BIN_DIR" "$DATA/applications" "$DATA/icons/hicolor/scalable/apps"
 install -m755 "$SRC/sysdeck/app.py" "$SRC/sysdeck/server.py" "$APP_DIR/"
 install -m644 "$SRC/sysdeck/sysdeck.svg" "$APP_DIR/"

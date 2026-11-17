@@ -12,12 +12,16 @@ Ollama telemetry comes from two places:
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import threading
 import time
+import urllib.parse
 import urllib.request
 from collections import deque
 from datetime import datetime
@@ -903,6 +907,225 @@ def unload_models() -> list[str]:
     return names
 
 
+# ───────────────────────────── media (MPRIS) ────────────────────────────
+# Every Linux media player registers on the session bus as org.mpris.MediaPlayer2.<name>:
+# Spotify, Firefox / Chromium / Chrome tabs (YouTube, SoundCloud, ...), VLC, mpv
+# (with mpv-mpris), Rhythmbox, Elisa, Strawberry, Audacious, ... One interface covers them all.
+
+MPRIS = "org.mpris.MediaPlayer2"
+MPRIS_PATH = "/org/mpris/MediaPlayer2"
+MPRIS_SKIP = {"playerctld"}  # proxies that mirror another player
+NO_TRACK = "/org/mpris/MediaPlayer2/TrackList/NoTrack"
+OBJ_PATH = re.compile(r"^/(?:[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*)?$")
+ART_MAX = 8 * 1024 * 1024
+
+media_lock = threading.Lock()
+# ident: name → Identity, since: name → when it started playing, last: name → last seen playing,
+# pin: (name, when) chosen in the UI, art: key → artUrl, tid: name → mpris:trackid
+_media: dict = {"ident": {}, "since": {}, "last": {}, "pin": None, "art": {}, "tid": {}}
+_art_cache: dict = {"url": None, "body": b"", "ctype": ""}
+
+
+def _ubus(*args: str, timeout: float = 2.0):
+    """busctl on the session bus. Returns parsed JSON ({} when there is no output); raises on failure."""
+    r = subprocess.run(["busctl", "--user", "--json=short", f"--timeout={timeout}", "--", *args],
+                       capture_output=True, text=True, timeout=timeout + 1)
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr.strip() or "busctl failed")[:160])
+    return json.loads(r.stdout) if r.stdout.strip() else {}
+
+
+def _props(name: str, iface: str) -> dict:
+    return _unwrap(_ubus("call", name, MPRIS_PATH, "org.freedesktop.DBus.Properties", "GetAll", "s", iface))
+
+
+def _read_player(name: str) -> dict:
+    p = _props(name, MPRIS + ".Player")
+    md = {k: (v.get("data") if isinstance(v, dict) else v) for k, v in (p.get("Metadata") or {}).items()}
+    if name not in _media["ident"]:
+        short = name[len(MPRIS) + 1:].split(".")[0]
+        try:
+            ident = _props(name, MPRIS).get("Identity") or short.capitalize()
+        except Exception:  # noqa: BLE001 - root interface is optional in practice
+            ident = short.capitalize()
+        _media["ident"][name] = ident
+    joined = lambda v: ", ".join(v) if isinstance(v, list) else (v or "")  # noqa: E731
+    us = lambda v: v / 1e6 if isinstance(v, (int, float)) and v > 0 else None  # noqa: E731
+    art = md.get("mpris:artUrl") or ""
+    key = hashlib.sha1(art.encode()).hexdigest()[:12] if art else None
+    if key:
+        _media["art_next"][key] = art
+    _media["tid"][name] = md.get("mpris:trackid") or ""
+    return {
+        "id": name,
+        "name": _media["ident"][name],
+        "status": p.get("PlaybackStatus") or "Stopped",
+        "title": joined(md.get("xesam:title")),
+        "artist": joined(md.get("xesam:artist")) or joined(md.get("xesam:albumArtist")),
+        "album": joined(md.get("xesam:album")),
+        "length": us(md.get("mpris:length")),
+        "position": (p["Position"] / 1e6 if isinstance(p.get("Position"), (int, float)) and p["Position"] >= 0 else None),
+        "rate": p.get("Rate") or 1.0,
+        "volume": p.get("Volume"),
+        "shuffle": p.get("Shuffle"),
+        "loop": p.get("LoopStatus"),
+        "art": key,
+        "can": {
+            "control": p.get("CanControl", True),
+            "play": p.get("CanPlay", True),
+            "pause": p.get("CanPause", True),
+            "next": p.get("CanGoNext", False),
+            "prev": p.get("CanGoPrevious", False),
+            "seek": p.get("CanSeek", False) and bool(md.get("mpris:length")),
+        },
+    }
+
+
+def _same_media(a: dict, b: dict) -> bool:
+    """Two bus names showing one stream (e.g. a Chrome tab and KDE's browser-integration mirror of it)."""
+    if a["status"] != b["status"]:
+        return False
+    if a["length"] and b["length"]:
+        return abs(a["length"] - b["length"]) < 1 and abs((a["position"] or 0) - (b["position"] or 0)) < 3
+    ta, tb = a["title"].lower(), b["title"].lower()
+    return bool(ta and tb) and (ta in tb or tb in ta)
+
+
+def sample_media() -> None:
+    with media_lock:
+        try:
+            names = _ubus("call", "org.freedesktop.DBus", "/org/freedesktop/DBus",
+                          "org.freedesktop.DBus", "ListNames")["data"][0]
+        except (FileNotFoundError, RuntimeError, subprocess.TimeoutExpired, KeyError, IndexError) as e:
+            put("media", {"available": False, "players": [], "error": str(e)[:120]})
+            return
+        names = sorted(
+            (n for n in names if n.startswith(MPRIS + ".") and n[len(MPRIS) + 1:].split(".")[0] not in MPRIS_SKIP),
+            key=lambda n: "plasma-browser-integration" in n,  # KDE's browser proxy duplicates the tab's own player
+        )
+        _media["art_next"] = {}
+        players = []
+        for n in names:
+            try:
+                pl = _read_player(n)
+            except Exception:  # noqa: BLE001 - one hung or half-implemented player must not hide the rest
+                continue
+            if not any(_same_media(pl, q) for q in players):
+                players.append(pl)
+        _media["art"] = _media.pop("art_next")  # swap whole, so /api/media/art never sees it half-built
+
+        now = time.time()
+        ids = {p["id"] for p in players}
+        for p in players:
+            if p["status"] == "Playing":
+                _media["since"].setdefault(p["id"], now)
+                _media["last"][p["id"]] = now
+            else:
+                _media["since"].pop(p["id"], None)
+        for d in ("ident", "since", "last", "tid"):
+            for k in [k for k in _media[d] if k not in ids]:
+                del _media[d][k]
+        # A player picked in the UI stays active until it closes or another one starts playing.
+        pin = _media["pin"]
+        if pin and (pin[0] not in ids or any(t > pin[1] for k, t in _media["since"].items() if k != pin[0])):
+            pin = _media["pin"] = None
+        if pin:
+            active = pin[0]
+        elif players:
+            active = max(players, key=lambda p: (
+                p["status"] == "Playing",
+                _media["since"].get(p["id"]) or _media["last"].get(p["id"], 0),
+                p["status"] == "Paused",
+            ))["id"]
+        else:
+            active = None
+        put("media", {"available": True, "t": now, "active": active, "pinned": bool(pin), "players": players})
+
+
+def media_action(body: dict) -> None:
+    act = body.get("action")
+    m = state.get("media") or {}
+    players = {p["id"]: p for p in m.get("players", [])}
+    if act == "select":
+        if body.get("player") not in players:
+            raise ValueError("unknown player")
+        _media["pin"] = (body["player"], time.time())
+    else:
+        p = players.get(body.get("player")) or players.get(m.get("active"))
+        if not p:
+            raise ValueError("no player")
+        name, iface = p["id"], MPRIS + ".Player"
+        call = lambda method, *a: _ubus("call", name, MPRIS_PATH, iface, method, *a)  # noqa: E731
+        setp = lambda prop, sig, v: _ubus("set-property", name, MPRIS_PATH, iface, prop, sig, v)  # noqa: E731
+        simple = {"play_pause": "PlayPause", "play": "Play", "pause": "Pause",
+                  "stop": "Stop", "next": "Next", "previous": "Previous"}
+        if act in simple:
+            call(simple[act])
+        elif act == "seek":
+            target = max(0.0, min(float(body["value"]), (p["length"] or 1e9) - 0.5))
+            tid = _media["tid"].get(name) or ""
+            if OBJ_PATH.match(tid) and tid != NO_TRACK:
+                call("SetPosition", "ox", tid, str(int(target * 1e6)))
+            else:  # no usable track id: seek relative to where we think it is
+                pos = p["position"] or 0.0
+                if p["status"] == "Playing":
+                    pos += (time.time() - m.get("t", time.time())) * (p["rate"] or 1.0)
+                call("Seek", "x", str(int((target - pos) * 1e6)))
+        elif act == "volume":
+            setp("Volume", "d", repr(max(0.0, min(1.0, float(body["value"])))))
+        elif act == "shuffle":
+            setp("Shuffle", "b", "true" if body.get("value") else "false")
+        elif act == "loop":
+            if body.get("value") not in ("None", "Track", "Playlist"):
+                raise ValueError("bad loop status")
+            setp("LoopStatus", "s", body["value"])
+        else:
+            raise ValueError("unknown action")
+        time.sleep(0.15)  # let the player apply it before re-reading
+    sample_media()
+    with tick:
+        tick.notify_all()
+
+
+def _sniff(b: bytes) -> str | None:
+    if b.startswith(b"\x89PNG"):
+        return "image/png"
+    if b.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if b.startswith(b"GIF8"):
+        return "image/gif"
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def media_art(key: str):
+    """Cover art of a current player, by key. Only URLs a player advertised are read, and only images are served."""
+    url = _media["art"].get(key)
+    if not url:
+        return None
+    if _art_cache["url"] == url:
+        return _art_cache["body"], _art_cache["ctype"]
+    body = b""
+    if url.startswith("file://"):
+        path = urllib.parse.unquote(urllib.parse.urlparse(url).path)
+        st = os.stat(path)
+        if stat.S_ISREG(st.st_mode) and st.st_size <= ART_MAX:
+            body = Path(path).read_bytes()
+    elif url.startswith(("https://", "http://")):
+        req = urllib.request.Request(url, headers={"User-Agent": "sysdeck"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            body = r.read(ART_MAX + 1)
+    elif url.startswith("data:image/"):
+        head, _, data = url.partition(",")
+        body = base64.b64decode(data) if head.endswith(";base64") else urllib.parse.unquote_to_bytes(data)
+    ctype = _sniff(body[:16])
+    if not ctype or len(body) > ART_MAX:
+        return None
+    _art_cache.update(url=url, body=body, ctype=ctype)
+    return body, ctype
+
+
 # ───────────────────────────── HTTP ─────────────────────────────────────
 
 FILES = {
@@ -952,6 +1175,16 @@ class Handler(BaseHTTPRequestHandler):
             self._json(snapshot(True))
         elif path == "/api/stream":
             self._stream()
+        elif path == "/api/media/art":
+            key = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get("k", [""])[0]
+            try:
+                art = media_art(key)
+            except Exception:  # noqa: BLE001 - missing file, network error, bad data URI
+                art = None
+            if art:
+                self._send(200, art[0], art[1])
+            else:
+                self._send(404, b"no art", "text/plain")
         else:
             self._send(404, b"not found", "text/plain")
 
@@ -971,6 +1204,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True})
         if self.path == "/api/unload":
             return self._json({"unloaded": unload_models()})
+        if self.path == "/api/media":
+            try:
+                media_action(body)
+            except (ValueError, KeyError, TypeError) as e:
+                return self._json({"error": str(e)}, 400)
+            except (RuntimeError, subprocess.TimeoutExpired) as e:
+                return self._json({"error": str(e)}, 502)
+            return self._json({"ok": True})
         return self._json({"error": "unknown"}, 404)
 
     def _stream(self):
@@ -1014,6 +1255,7 @@ def start(port: int | None = None) -> ThreadingHTTPServer:
     every(15.0, sample_storage)
     every(10.0, sample_ifaces)
     every(2.0, llm_watchdog)
+    every(1.0, sample_media)
     srv = ThreadingHTTPServer((HOST, PORT), Handler)
     srv.daemon_threads = True
     threading.Thread(target=srv.serve_forever, daemon=True, name="http").start()
