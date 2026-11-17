@@ -8,7 +8,8 @@ just shows the running window.
 
 Config: ~/.config/sysdeck/config.json, e.g.
         {"screen": "HDMI-A-1", "fullscreen": true, "zoom": 1.25, "privacy": false}
-        An empty "screen" picks a secondary monitor automatically.
+        An empty "screen" picks a secondary monitor automatically. With "fullscreen": false
+        it is a normal resizable window; its size ("window") and "maximized" are remembered.
 Keys:   F11 full-screen · Ctrl +/-/0 zoom · Ctrl+R reload · Ctrl+W hide to tray · Ctrl+Q quit
 """
 from __future__ import annotations
@@ -28,7 +29,7 @@ os.environ.setdefault(
     "--enable-gpu-rasterization --ignore-gpu-blocklist --disable-features=Translate",
 )
 
-from PyQt6.QtCore import QUrl, Qt  # noqa: E402
+from PyQt6.QtCore import QEvent, QTimer, QUrl, Qt  # noqa: E402
 from PyQt6.QtGui import QAction, QActionGroup, QColor, QGuiApplication, QIcon, QKeySequence, QShortcut  # noqa: E402
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket  # noqa: E402
 from PyQt6.QtWebEngineCore import QWebEngineSettings  # noqa: E402
@@ -38,7 +39,8 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QMenu, QSystemTrayIcon  #
 APP_ID = "sysdeck"
 ICON = HERE / "sysdeck.svg"
 CONFIG = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "sysdeck" / "config.json"
-DEFAULTS = {"screen": "", "fullscreen": True, "port": 8790, "zoom": 1.0, "privacy": False}
+DEFAULTS = {"screen": "", "fullscreen": True, "port": 8790, "zoom": 1.0, "privacy": False,
+            "window": [1280, 800], "maximized": False}
 ZOOMS = [1.0, 1.15, 1.25, 1.4, 1.5, 1.65, 1.75, 2.0]
 
 
@@ -81,13 +83,16 @@ class Deck(QMainWindow):
         self.quitting = False
         self.setWindowTitle("SYSDECK")
         self.setWindowIcon(QIcon(str(ICON)))
-        self.resize(1600, 900)
+        self.setMinimumSize(420, 320)
+        self.resize(*self.window_size())
+        self.placing = False  # ignore the resizes we cause ourselves while (re)placing the window
+        self.save_timer = QTimer(self, singleShot=True, interval=600, timeout=lambda: save_config(self.cfg))
 
         self.view = QWebEngineView(self)
         self.view.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         self.view.page().setBackgroundColor(QColor("#05070b"))
         st = self.view.settings()
-        st.setAttribute(QWebEngineSettings.WebAttribute.ShowScrollBars, False)
+        st.setAttribute(QWebEngineSettings.WebAttribute.ShowScrollBars, True)  # panels scroll when they overflow
         st.setAttribute(QWebEngineSettings.WebAttribute.ErrorPageEnabled, False)
         self.view.setZoomFactor(float(cfg.get("zoom", DEFAULTS["zoom"])))
         self.view.setUrl(QUrl(self.page_url()))
@@ -141,20 +146,50 @@ class Deck(QMainWindow):
         primary = QGuiApplication.primaryScreen()
         return next((s for s in screens if s is not primary), primary)
 
+    def window_size(self) -> tuple[int, int]:
+        try:
+            w, h = (int(v) for v in self.cfg.get("window") or DEFAULTS["window"])
+        except (TypeError, ValueError):
+            w, h = DEFAULTS["window"]
+        return max(420, w), max(320, h)
+
     def present(self):
         """(Re)map the window on the target screen. On Wayland a mapped window
         can't move itself between outputs, so hide → set screen → show."""
         scr = self.target_screen()
+        self.placing = True
         if self.isVisible():
             self.hide()
         self.setScreen(scr)
-        self.setGeometry(scr.availableGeometry())
+        ag = scr.availableGeometry()
         if self.cfg.get("fullscreen", True):
+            self.setGeometry(ag)
             self.showFullScreen()
         else:
-            self.showMaximized()
+            # a normal, resizable window: last size, centred (compositors may place it themselves)
+            w, h = self.window_size()
+            w, h = min(w, ag.width()), min(h, ag.height())
+            self.setGeometry(ag.x() + (ag.width() - w) // 2, ag.y() + (ag.height() - h) // 2, w, h)
+            if self.cfg.get("maximized"):
+                self.showMaximized()
+            else:
+                self.showNormal()
         self.raise_()
         self.activateWindow()
+        QTimer.singleShot(400, lambda: setattr(self, "placing", False))
+
+    # remember the windowed size / maximized state
+    def resizeEvent(self, ev):  # noqa: N802
+        super().resizeEvent(ev)
+        if not self.placing and self.isVisible() and not (self.isFullScreen() or self.isMaximized()):
+            self.cfg["window"] = [self.width(), self.height()]
+            self.save_timer.start()
+
+    def changeEvent(self, ev):  # noqa: N802
+        super().changeEvent(ev)
+        if ev.type() == QEvent.Type.WindowStateChange and not self.placing and not self.isFullScreen():
+            self.cfg["maximized"] = self.isMaximized()
+            self.save_timer.start()
 
     def move_to(self, name: str):
         self.cfg["screen"] = name

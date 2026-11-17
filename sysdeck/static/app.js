@@ -300,15 +300,6 @@ function buildCores(n) {
   }
 }
 
-/* how many fixed-height rows fit in a list without showing a half-cut row */
-/* rows that fit, measured from the rendered row height (works at any zoom/density) */
-function fitRows(el, rowH) {
-  const first = el.firstElementChild;
-  const gap = parseFloat(getComputedStyle(el).rowGap) || 0;
-  const h = first && first.offsetHeight ? first.offsetHeight + gap : rowH;
-  return Math.max(1, Math.floor((el.clientHeight + gap) / h));
-}
-
 function tiles(el, items) {
   const html = items.map(([label, val, cls]) =>
     `<div class="tile"><span>${label}</span><b class="${cls || ""}">${val}</b></div>`).join("");
@@ -416,8 +407,8 @@ function renderProcs(s) {
   const topMem = Math.max(2 * GiB, ...p.mem.map((x) => x.mem));
   const row = (x, val, w) => `<li class="${isRunner(x.name) ? "hl" : ""}" style="--w:${w}%">
       <span class="n">${esc(x.name)}${x.n > 1 ? `<em>×${x.n}</em>` : ""}</span><span class="v">${val}</span></li>`;
-  setHTML($("pl-cpu"), p.cpu.slice(0, fitRows($("pl-cpu"), 30)).map((x) => row(x, `${x.cpu.toFixed(1)}%`, (x.cpu / topCpu * 100).toFixed(1))).join(""));
-  setHTML($("pl-mem"), p.mem.slice(0, fitRows($("pl-mem"), 30)).map((x) => row(x, fmtBytes(x.mem), (x.mem / topMem * 100).toFixed(1))).join(""));
+  setHTML($("pl-cpu"), p.cpu.map((x) => row(x, `${x.cpu.toFixed(1)}%`, (x.cpu / topCpu * 100).toFixed(1))).join(""));
+  setHTML($("pl-mem"), p.mem.map((x) => row(x, fmtBytes(x.mem), (x.mem / topMem * 100).toFixed(1))).join(""));
 }
 
 function aiPhase(s) {
@@ -532,7 +523,7 @@ function renderAI(s) {
     ["Runner RAM", fmtBytes(procs.ollama_rss || 0)],
   ]);
 
-  const reqs = (l.requests || []).slice().reverse().slice(0, fitRows($("feed"), 24));
+  const reqs = (l.requests || []).slice().reverse();
   setHTML($("feed"), reqs.length ? reqs.map((r) => `<li class="${r.status >= 400 ? "err" : ""}">
       <span>${hhmmss(r.t)}</span>
       <span class="p">${esc(r.method)} ${esc(r.path)}</span>
@@ -678,7 +669,7 @@ function renderDisk(s) {
 const DEV = new Set(["node", "bun", "deno", "python", "python3", "uvicorn", "gunicorn", "java", "ruby", "php", "go", "cargo", "dotnet", "npm", "pnpm", "vite", "next-server"]);
 function renderDev(s) {
   const rank = (p) => (p.mine && (DEV.has(p.name) || p.project) ? 0 : ["ollama", "sysdeck"].includes(p.name) ? 1 : 2);
-  const ports = (s.ports || []).slice().sort((a, b) => rank(a) - rank(b) || a.port - b.port).slice(0, fitRows($("ports"), 33));
+  const ports = (s.ports || []).slice().sort((a, b) => rank(a) - rank(b) || a.port - b.port);
   setHTML($("ports"), ports.length ? ports.map((p) => {
     const dev = p.mine && (DEV.has(p.name) || p.project);
     const lan = p.addr === "0.0.0.0" || p.addr === "::";
@@ -896,7 +887,9 @@ if (FPS > 0) {
   requestAnimationFrame(frame);
 }
 
-/* the dashboard never scrolls; undo any scroll the engine applies when zoom changes */
-const unscroll = () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); };
+/* The full-screen layout never scrolls the page (panels scroll instead); undo any scroll the
+   engine applies when zoom changes. The flowing layout for small windows scrolls normally. */
+const FLOW = matchMedia("(max-width: 1100px), (max-height: 560px)");
+const unscroll = () => { if (!FLOW.matches && (window.scrollX || window.scrollY)) window.scrollTo(0, 0); };
 window.addEventListener("resize", unscroll);
 window.addEventListener("scroll", unscroll, { passive: true });

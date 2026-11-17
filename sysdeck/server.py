@@ -425,7 +425,7 @@ llm = {
     "prefill_tokens": 0,
     "load": None,  # {t, name, gpu_layers, layers, draft, ready_s}
     "runs": deque(maxlen=40),  # completed generations
-    "requests": deque(maxlen=12),  # API requests (non-polling)
+    "requests": deque(maxlen=30),  # API requests (non-polling)
 }
 _pending: dict = {}
 
@@ -445,7 +445,7 @@ def _publish_llm() -> None:
         "prefill_tokens": llm["prefill_tokens"],
         "load": dict(llm["load"]) if llm["load"] else None,
         "runs": [dict(r) for r in list(llm["runs"])[-24:]],
-        "requests": [dict(r) for r in list(llm["requests"])[-8:]],
+        "requests": [dict(r) for r in llm["requests"]],
     }
     put("llm", snap)
 
@@ -605,8 +605,8 @@ def sample_procs() -> None:
     vals = list(groups.values())
     for g in vals:
         g["cpu"] = round(g["cpu"], 1)
-    top_cpu = sorted(vals, key=lambda g: -g["cpu"])[:8]
-    top_mem = sorted(vals, key=lambda g: -g["mem"])[:8]
+    top_cpu = sorted(vals, key=lambda g: -g["cpu"])[:20]
+    top_mem = sorted(vals, key=lambda g: -g["mem"])[:20]
     put("procs", {"count": count, "cpu": top_cpu, "mem": top_mem,
                   "ollama_rss": ollama_rss, "ollama_cpu": round(ollama_cpu, 1)})
 
@@ -657,7 +657,7 @@ def sample_ports() -> None:
         seen.values(),
         key=lambda e: (not (e["name"] in DEV_NAMES or e["project"]), not e["mine"], e["port"]),
     )
-    put("ports", ports[:14])
+    put("ports", ports[:40])
 
 
 def sample_docker() -> None:

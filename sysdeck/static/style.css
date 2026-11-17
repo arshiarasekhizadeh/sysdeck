@@ -36,6 +36,7 @@ body {
 ol { list-style: none; }
 b { font-weight: 600; }
 [hidden] { display: none !important; }
+* { scrollbar-width: thin; scrollbar-color: rgba(148, 170, 220, .22) transparent; }
 
 .ambient {
   position: fixed; inset: 0; pointer-events: none;
@@ -110,9 +111,9 @@ b { font-weight: 600; }
 #p-procs { flex: 1; }
 #p-ai { flex: 1.62; }
 #p-gpu { flex: 1; }
-#p-net { flex: .66; }
-#p-disk { flex: 2.4; }
-#p-dev { flex: .7; }
+#p-net { flex: .82; }
+#p-disk { flex: 2; }
+#p-dev { flex: .82; }
 
 .panel {
   --a: var(--cyan); --a2: var(--violet);
@@ -126,7 +127,8 @@ b { font-weight: 600; }
     radial-gradient(420px 160px at 0% 0%, color-mix(in srgb, var(--a) 9%, transparent), transparent 70%),
     linear-gradient(180deg, rgba(17, 22, 33, .86), rgba(9, 12, 19, .86));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035), 0 24px 48px -28px rgba(0, 0, 0, .8);
-  overflow: hidden;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
 }
 .panel::before {
   content: ""; position: absolute; left: 18px; right: 18px; top: -1px; height: 1px;
@@ -210,7 +212,7 @@ b { font-weight: 600; }
 .kv dd.warn { color: var(--amber); }
 .kv dd.crit { color: var(--red); }
 
-.chart-wrap { position: relative; flex: 1 1 0; min-height: 50px; }
+.chart-wrap { position: relative; flex: 1 1 0; min-height: 40px; }
 .chart-wrap.short { flex: .9 1 0; }
 .chart-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
@@ -254,9 +256,9 @@ b { font-weight: 600; }
 .track i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--a), var(--a2)); }
 
 /* ───────────── processes ───────────── */
-.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; flex: 1; min-height: 0; }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; flex: 1; min-height: 120px; }
 .two > div { min-width: 0; display: flex; flex-direction: column; min-height: 0; }
-.plist { display: flex; flex-direction: column; gap: 4px; overflow: hidden; flex: 1 1 0; min-height: 0; }
+.plist { display: flex; flex-direction: column; gap: 4px; overflow: hidden auto; flex: 1 1 0; min-height: 0; }
 .plist li {
   position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center;
   padding: 5px 8px; border-radius: 6px; font: 13px/1.2 var(--sans); overflow: hidden; flex: none;
@@ -340,7 +342,7 @@ b { font-weight: 600; }
 .prefill i { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, rgba(63, 208, 255, .25), rgba(63, 208, 255, .6)); }
 .prefill span { position: relative; font: 600 10.5px/16px var(--mono); padding-left: 7px; color: var(--cyan); letter-spacing: .08em; }
 
-.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; flex: none; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; flex: none; }
 .tiles.four { grid-template-columns: repeat(2, minmax(0, 1fr)); flex: 1; }
 .tile {
   min-width: 0; padding: 9px 11px; border-radius: 10px;
@@ -352,8 +354,8 @@ b { font-weight: 600; }
 .tile b.warn { color: var(--amber); }
 .tile b.crit { color: var(--red); }
 
-.feed-wrap { display: flex; flex-direction: column; gap: 7px; flex: 1 1 0; min-height: 0; }
-.feed { display: flex; flex-direction: column; gap: 2px; overflow: hidden; min-height: 0; flex: 1 1 0; }
+.feed-wrap { display: flex; flex-direction: column; gap: 7px; flex: 1 1 0; min-height: 84px; }
+.feed { display: flex; flex-direction: column; gap: 2px; overflow: hidden auto; min-height: 0; flex: 1 1 0; }
 .feed li {
   display: grid; grid-template-columns: 64px minmax(0, 1fr) 90px 82px 58px; gap: 10px; align-items: center;
   font: 12px/1 var(--mono); color: var(--dim); padding: 5px 8px; border-radius: 6px;
@@ -367,7 +369,7 @@ b { font-weight: 600; }
 .feed .d { text-align: right; }
 .feed .empty { grid-column: 1 / -1; color: var(--faint); }
 
-.ai-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.ai-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: none; }
 button {
   display: inline-flex; align-items: center; gap: 7px;
   font: 600 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
@@ -404,7 +406,7 @@ button.busy svg { animation: rot 1.2s linear infinite; }
 .io-stack .io b { font-size: 19px; margin-top: 3px; }
 .disk-top .chart-wrap { min-height: 0; }
 
-.drives { display: flex; flex-direction: column; gap: 7px; flex: 1 1 0; min-height: 0; overflow: hidden; }
+.drives { display: flex; flex-direction: column; gap: 7px; flex: 1 1 0; min-height: 110px; overflow: hidden auto; }
 .drive {
   display: flex; flex-direction: column; gap: 7px; padding: 9px 11px 10px;
   border-radius: 10px; background: rgba(255, 255, 255, .025); border: 1px solid var(--line); flex: none;
@@ -451,7 +453,7 @@ button.busy svg { animation: rot 1.2s linear infinite; }
 .drv-health .warn { color: var(--amber); }
 
 /* ───────────── dev ───────────── */
-.ports { display: flex; flex-direction: column; gap: 3px; flex: 1 1 0; min-height: 0; overflow: hidden; }
+.ports { display: flex; flex-direction: column; gap: 3px; flex: 1 1 0; min-height: 64px; overflow: hidden auto; }
 .ports li {
   display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 10px; align-items: center;
   padding: 5px 8px; border-radius: 6px; background: rgba(255, 255, 255, .02); flex: none;
@@ -462,7 +464,7 @@ button.busy svg { animation: rot 1.2s linear infinite; }
 .ports .who em { font-style: normal; color: var(--dim); margin-left: 6px; font-size: 12px; }
 .scope { font: 600 10px/1 var(--mono); letter-spacing: .12em; padding: 4px 7px; border-radius: 999px; color: var(--dim); border: 1px solid var(--line2); }
 .scope.lan { color: var(--amber); border-color: rgba(255, 192, 77, .4); }
-.containers { display: flex; flex-direction: column; gap: 3px; flex: none; max-height: 30%; overflow: hidden; }
+.containers { display: flex; flex-direction: column; gap: 3px; flex: none; max-height: 30%; min-height: 1.6em; overflow: hidden auto; }
 .containers li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; font: 12px/1.2 var(--mono); padding: 5px 8px; border-radius: 6px; background: rgba(255, 255, 255, .02); }
 .containers li .nm { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .containers li .nm em { font-style: normal; color: var(--faint); margin-left: 6px; }
@@ -470,7 +472,7 @@ button.busy svg { animation: rot 1.2s linear infinite; }
 .containers .empty { color: var(--faint); background: none; padding-left: 0; }
 
 /* ───────────── media (MPRIS) ───────────── */
-#p-media { flex: none; isolation: isolate; }
+#p-media { flex: none; isolation: isolate; overflow: hidden; }  /* fixed content; the blurred art bleeds past the edges */
 /* blurred cover behind the panel; static, so it costs nothing once painted */
 .np-bg {
   position: absolute; inset: -40px; z-index: -1; pointer-events: none;
@@ -604,7 +606,7 @@ html:not(.anim) *, html:not(.anim) *::before, html:not(.anim) *::after { transit
   .plist { gap: 2px; }
   .plist li { padding: 3px 7px; font-size: 11.5px; }
   .plist .v { font-size: 10.5px; }
-  .two { gap: 10px; }
+  .two { gap: 10px; min-height: 90px; }
 
   /* center */
   #p-ai { flex: 1.75; } #p-gpu { flex: 1; }
@@ -612,14 +614,14 @@ html:not(.anim) *, html:not(.anim) *::before, html:not(.anim) *::after { transit
   .ai-model { gap: 10px; }
   .model-name { font-size: 24px; }
   .model-name.none { font-size: 20px; }
-  .chips { margin-top: 5px; gap: 4px; flex-wrap: nowrap; overflow: hidden; }
+  .chips { margin-top: 5px; gap: 4px; }
   .chip { font-size: 10px; padding: 3px 7px; }
   .keepalive { gap: 3px; }
   .keepalive > span { font-size: 8px; }
   .placement { gap: 5px; }
   .pl-bar { height: 13px; }
   .pl-foot { font-size: 10.5px; gap: 14px; }
-  .hint { font-size: 10.5px; min-height: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hint { font-size: 10.5px; min-height: 0; }
   .tps-num em { white-space: nowrap; }
   .tps { grid-template-columns: 150px minmax(0, 1fr); gap: 10px; min-height: 58px; flex: 1 1 0; }
   #tps { font-size: 38px; }
@@ -627,12 +629,12 @@ html:not(.anim) *, html:not(.anim) *::before, html:not(.anim) *::after { transit
   .tps-num em { font-size: 9px; }
   .prefill { height: 13px; }
   .prefill span { font-size: 9px; line-height: 13px; }
-  .tiles { gap: 5px; }
+  .tiles { gap: 5px; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); }
   .tile { padding: 5px 8px; border-radius: 8px; }
   .tile span { font-size: 8.5px; letter-spacing: .08em; }
   .tile b { font-size: 14px; margin-top: 3px; }
   .tile b small { font-size: 9.5px; margin-left: 2px; }
-  .feed-wrap { gap: 4px; min-height: 46px; }
+  .feed-wrap { gap: 4px; min-height: 60px; }
   .feed li { grid-template-columns: 56px minmax(0, 1fr) 62px 58px 46px; gap: 6px; font-size: 10.5px; padding: 3px 6px; }
   .feed .p::before { margin-right: 5px; width: 5px; height: 5px; }
   button { font-size: 9.5px; padding: 5px 8px; gap: 5px; }
@@ -646,7 +648,6 @@ html:not(.anim) *, html:not(.anim) *::before, html:not(.anim) *::after { transit
   .tiles.four { gap: 5px; }
   .vram-apps { gap: 4px; }
   .segbar.thin { height: 7px; }
-  #vram-legend { flex-wrap: nowrap; overflow: hidden; }
 
   /* right */
   #p-net { flex: .62; } #p-disk { flex: 1.75; } #p-dev { flex: .8; }
@@ -658,7 +659,7 @@ html:not(.anim) *, html:not(.anim) *::before, html:not(.anim) *::after { transit
   .disk-top { grid-template-columns: auto minmax(0, 1fr); height: 40px; gap: 14px; }
   .io-stack { flex-direction: row; justify-content: flex-start; align-items: flex-end; gap: 14px; }
   .io-stack .io b { font-size: 15px; margin-top: 1px; }
-  .drives { gap: 5px; }
+  .drives { gap: 5px; min-height: 80px; }
   .drive { padding: 5px 8px 6px; gap: 4px; border-radius: 8px; }
   .drv-head { gap: 6px; }
   .drv-tag { font-size: 8px; padding: 3px 4px; }
@@ -669,7 +670,7 @@ html:not(.anim) *, html:not(.anim) *::before, html:not(.anim) *::after { transit
   .drv-temp { min-width: 26px; }
   .pmap { height: 15px; }
   .seg > span { font-size: 9.5px; padding: 0 5px; }
-  .drv-health { font-size: 9.5px; gap: 2px 8px; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+  .drv-health { font-size: 9.5px; gap: 2px 8px; }
   .ports { gap: 2px; }
   .ports li { padding: 3px 7px; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 6px; }
   .ports .port { font-size: 11px; }
@@ -691,4 +692,39 @@ html:not(.anim) *, html:not(.anim) *::before, html:not(.anim) *::after { transit
   .np-ctl .np-play svg { width: 11px; height: 11px; }
   .np-vol svg { width: 12px; height: 12px; }
   .np-src button { font-size: 9px; padding: 3px 6px; }
+}
+
+/* ───────────── flowing layout: narrow or very short windows ─────────────
+   Below these sizes panels keep their natural height and the page scrolls,
+   instead of squeezing every panel until its data no longer fits. */
+@media (max-width: 1100px), (max-height: 560px) {
+  html { height: auto; overflow: hidden auto; }
+  body { height: auto; overflow: visible; }
+  .app { height: auto; min-height: 100vh; grid-template-rows: auto auto; }
+  .top { display: flex; flex-wrap: wrap; row-gap: 8px; }
+  .sysline { flex-wrap: wrap; }
+  .alerts { flex-wrap: wrap; justify-content: flex-start; }
+  .clock { margin-left: auto; }
+  .grid { align-items: start; }
+  .col, .panel { min-height: auto; }
+  #p-cpu, #p-mem, #p-procs, #p-ai, #p-gpu, #p-media, #p-net, #p-disk, #p-dev { flex: none; }
+  .chart-wrap { flex: none; height: 96px; }
+  .chart-wrap.short { height: 70px; }
+  .disk-top .chart-wrap { height: auto; }
+  .tps { flex: none; height: 120px; }
+  .two, .feed-wrap { flex: none; min-height: 0; }
+  .plist, .feed, .ports, .drives { flex: none; min-height: 0; max-height: 300px; }
+  .containers { max-height: 200px; }
+}
+/* two columns: AI + GPU across the top, the rest side by side */
+@media (max-width: 1100px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .col.center { grid-column: 1 / -1; order: -1; }
+}
+/* one column */
+@media (max-width: 700px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .tps { grid-template-columns: minmax(110px, auto) minmax(0, 1fr); }
+  .feed li { grid-template-columns: 50px minmax(0, 1fr) auto auto auto; gap: 6px; }
+  .gpu-top { flex-wrap: wrap; }
 }

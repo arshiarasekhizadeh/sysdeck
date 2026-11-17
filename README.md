@@ -32,7 +32,8 @@ SYSDECK shows CPU, memory, GPU, storage, network and your dev servers at a glanc
 **App**
 - Native desktop app (PyQt6) with a tray icon, not a browser tab
 - Opens full-screen on the monitor you choose and remembers it
-- Zoom (Ctrl +/−/0 or tray menu) with a compact layout that keeps every panel complete on small or high-zoom screens
+- Zoom (Ctrl +/−/0 or tray menu) with a compact layout for small or high-zoom screens
+- **Resizable**: press F11 (or untick Full screen in the tray) for a normal window that remembers its size. The layout goes to two columns below ~1100 px and one column below ~700 px (CSS pixels, so zoom counts too), and nothing is cut off: any panel or list with more data than fits scrolls.
 - **Privacy mode** hides host name, IP addresses and project folders, which is handy for screen sharing and screenshots
 - Lightweight: no telemetry, no network access beyond `127.0.0.1`, except downloading the cover art your media player points to (e.g. Spotify's image CDN). Animations are tuned so the dashboard costs roughly 10–20% of one CPU core.
 
